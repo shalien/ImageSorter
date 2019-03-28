@@ -1,6 +1,9 @@
+import 'package:crypto/crypto.dart';
+import 'package:image/image.dart';
+
+
 import 'dart:core';
 import 'dart:io';
-import 'package:image/image.dart';
 
 Future<int> main() async {
 
@@ -13,12 +16,12 @@ Future<int> main() async {
     onedriveDirectory = await findOnedriveDirectory(homePathUri);
   } catch(ex) {
     print(ex);
-    return 2;
+    exitCode = 2;
   }
 
   if(onedriveDirectory is !Directory) {
     print("Missing Onedrive Directory");
-    return 0;
+    exitCode = 0;
   }
 
   var wallpaperDirectory;
@@ -27,12 +30,12 @@ Future<int> main() async {
     wallpaperDirectory = await findWallpaperDirectory(onedriveDirectory.uri);
   } catch (ex) {
     print(ex);
-    return 2;
+    exitCode = 2;
   }
 
   if(wallpaperDirectory is !Directory) {
     print("Missing Onedrive Directory");
-    return 0;
+    exitCode = 0;
   }
 
   var wallpaperFiles = await getAllImagesInWallpaperDirectory((wallpaperDirectory as FileSystemEntity).uri);
@@ -40,16 +43,27 @@ Future<int> main() async {
   for(var file in wallpaperFiles) {
 
     var image;
+    var bytes = await (file as File).readAsBytes();
 
     try {
-      image = decodeImage(File.fromUri(file.uri).readAsBytesSync());
+      image = decodeImage(bytes);
     } catch (ex) {
       print("Unable to load file ${filename(file.path)}");
       File.fromUri(file.uri).deleteSync();
       continue;
     }
 
-    print("${filename(file.path)} ${is16by9(image)}");
+    if(!is16by9(image)) {
+      await file.delete();
+      continue;
+    }
+
+    var disgest = sha256.convert(bytes);
+
+    await new File(wallpaperDirectory.path + Platform.pathSeparator + disgest.toString() + ".jpg")
+        .writeAsBytes(encodeJpg(image));
+
+    await (file as File).delete();
   }
 
 }
@@ -95,7 +109,7 @@ Future<List<FileSystemEntity>> getAllImagesInWallpaperDirectory(Uri uri) async {
 
 
 bool is16by9(Image image) {
-  return image.width % 16 == 0 && image.height % 9 == 0;
+  return image.width % 16 == 0 && image.height % 9 == 0 && image.width >= 1600 && image.height >= 900;
 }
 
 String filename(String path) => path.split(Platform.pathSeparator).last;
