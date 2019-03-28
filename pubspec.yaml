@@ -1,4 +1,7 @@
 name: imagesorter
 description: Dart test app and image sorter for my wallpaper
 dependencies:
-  image: ^2.0.7
+  args: any
+  crypto: any
+  dart_style: any
+  image: any
